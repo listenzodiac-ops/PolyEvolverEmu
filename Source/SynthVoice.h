@@ -107,6 +107,15 @@ struct Lfo
 // ---------------------------------------------------------------------------
 // Sound + Voice
 // ---------------------------------------------------------------------------
+// Values the step sequencer is currently imposing on every voice. Written by the processor
+// between audio segments, read by the voices; both run on the audio thread.
+struct SeqState
+{
+    float pitch = 0.0f;       // semitones
+    float cutoffOct = 0.0f;   // octaves
+    float pan = 0.0f;         // -1 (left) .. +1 (right)
+};
+
 class EvolverSound : public juce::SynthesiserSound
 {
 public:
@@ -117,8 +126,18 @@ public:
 class EvolverVoice : public juce::SynthesiserVoice
 {
 public:
-    explicit EvolverVoice (const ParamPointers& params)
-        : P (params), tables (WaveTables::instance()) {}
+    EvolverVoice (const ParamPointers& params, const SeqState& seqState)
+        : P (params), seq (seqState), tables (WaveTables::instance()) {}
+
+    // Restart both envelopes (used by the sequencer's gate mode on every step).
+    void retrigger()
+    {
+        if (isVoiceActive() && isKeyDown())
+        {
+            ampEnv.noteOn();
+            filterEnv.noteOn();
+        }
+    }
 
     bool canPlaySound (juce::SynthesiserSound* s) override
     {
@@ -152,6 +171,7 @@ public:
 
         readBlockParams();
         lastFilterEnv = 0.0f;
+        digOut[0] = digOut[1] = 0.0f;
         controlCounter = 0;
 
         ampEnv.noteOn();
@@ -207,13 +227,13 @@ public:
             // --- oscillators ---------------------------------------------------
             float mix = 0.0f;
 
-            for (int o = 0; o < numOscs; ++o)
+            // Analog oscillators 1 and 2
+            for (int o = 0; o < 2; ++o)
             {
                 if (snap.level[o] <= 0.0001f)
                     continue;
 
-                const float s = (o < 2) ? analogSample (phase[o], dt[o], curShape[o], curPW[o])
-                                        : digitalSample (phase[o], curShape[o], band[o]);
+                const float s = analogSample (phase[o], dt[o], curShape[o], curPW[o]);
 
                 phase[o] += dt[o];
                 if (phase[o] >= 1.0f)
@@ -222,15 +242,48 @@ public:
                 mix += s * snap.level[o];
             }
 
+            // Digital oscillators 3 and 4, with phase-modulation FM between them.
+            // An oscillator that is silent in the mix still runs if it is modulating the other one.
+            const bool run3 = snap.level[2] > 0.0001f || snap.fm34 > 0.0001f;
+            const bool run4 = snap.level[3] > 0.0001f || snap.fm43 > 0.0001f;
+
+            if (run3)
+            {
+                const float pm = fmDepth (snap.fm43) * digOut[1];
+                digOut[0] = digitalSample (wrap01 (phase[2] + pm), curShape[2], band[2]);
+
+                phase[2] += dt[2];
+                if (phase[2] >= 1.0f)
+                    phase[2] -= 1.0f;
+
+                mix += digOut[0] * snap.level[2];
+            }
+            else
+                digOut[0] = 0.0f;
+
+            if (run4)
+            {
+                const float pm = fmDepth (snap.fm34) * digOut[0];
+                digOut[1] = digitalSample (wrap01 (phase[3] + pm), curShape[3], band[3]);
+
+                phase[3] += dt[3];
+                if (phase[3] >= 1.0f)
+                    phase[3] -= 1.0f;
+
+                mix += digOut[1] * snap.level[3];
+            }
+            else
+                digOut[1] = 0.0f;
+
             mix *= 0.4f;   // headroom for up to four oscillators
 
             // --- filter + amp --------------------------------------------------
             const float filtered = filter.process (mix, snap.driveGain, snap.fourPole);
             const float out = filtered * aenv * ampGain * (0.25f + 0.75f * vel);
 
-            left[i] += out;
+            left[i] += out * panL;
             if (right != nullptr)
-                right[i] += out;
+                right[i] += out * panR;
         }
     }
 
@@ -241,6 +294,7 @@ private:
     struct Snapshot
     {
         float level[numOscs] {}, semi[numOscs] {}, fine[numOscs] {}, shape[numOscs] {}, pw[numOscs] {};
+        float fm43 = 0.0f, fm34 = 0.0f;
         float cutoff = 1000.0f, res = 0.0f, envAmt = 0.0f, keyTrack = 0.0f, driveGain = 1.0f;
         bool  fourPole = true;
         float lfoRate[numLfos] {}, lfoAmt[numLfos] {};
@@ -258,6 +312,8 @@ private:
             snap.pw   [o] = (o < 2) ? P.oscPW[o]->load() : 0.5f;
         }
 
+        snap.fm43      = P.fm43->load();
+        snap.fm34      = P.fm34->load();
         snap.cutoff    = P.cutoff->load();
         snap.res       = P.resonance->load();
         snap.envAmt    = P.filterEnv->load();
@@ -299,7 +355,7 @@ private:
             }
         }
 
-        const float baseNote = (float) note + pitchBend + pitchMod;
+        const float baseNote = (float) note + pitchBend + pitchMod + seq.pitch;
 
         for (int o = 0; o < numOscs; ++o)
         {
@@ -316,12 +372,26 @@ private:
 
         const float octaves = snap.envAmt * 5.0f * lastFilterEnv
                             + snap.keyTrack * ((float) note - 60.0f) / 12.0f
-                            + cutoffMod;
+                            + cutoffMod + seq.cutoffOct;
 
         const float fc = juce::jlimit (20.0f, 0.45f * sr, snap.cutoff * std::exp2 (octaves));
         filter.setCoefficients (fc, snap.res, sr);
 
         ampGain = juce::jlimit (0.0f, 1.5f, 1.0f + ampAcc);
+
+        // equal-power pan (centre = unity gain on both sides)
+        const float angle = (juce::jlimit (-1.0f, 1.0f, seq.pan) + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+        panL = std::cos (angle) * 1.41421356f;
+        panR = std::sin (angle) * 1.41421356f;
+    }
+
+    // FM depth in cycles of phase offset: squared so the low end of the knob is subtle.
+    static float fmDepth (float amount) noexcept   { return amount * amount * 2.0f; }
+
+    static float wrap01 (float t) noexcept
+    {
+        t -= std::floor (t);
+        return t >= 1.0f ? 0.0f : t;
     }
 
     // Analog-style osc: shape 0 = triangle, 0.5 = saw, 1 = pulse (crossfaded in between).
@@ -366,7 +436,9 @@ private:
     }
 
     const ParamPointers& P;
+    const SeqState& seq;
     const WaveTables& tables;
+    float panL = 1.0f, panR = 1.0f;
 
     juce::ADSR ampEnv, filterEnv;
     LadderFilter filter;
@@ -380,6 +452,7 @@ private:
     float lastFilterEnv = 0.0f, ampGain = 1.0f;
     unsigned int controlCounter = 0;
 
+    float digOut[2] {};   // last output of osc 3 and osc 4 (used as FM modulators)
     float phase[numOscs] {}, dt[numOscs] {}, curShape[numOscs] {}, curPW[numOscs] {};
     int band[numOscs] {};
 };

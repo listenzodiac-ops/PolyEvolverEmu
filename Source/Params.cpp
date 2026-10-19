@@ -49,6 +49,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
                                                Range (0.05f, 0.95f, 0.001f), 0.5f));
     }
 
+    // ---- Digital FM (oscillators 3 and 4 only) -----------------------------
+    layout.add (std::make_unique<APF> (PID { "fm_4to3", 1 }, "FM 4 > 3",
+                                       Range (0.0f, 1.0f, 0.001f), 0.0f));
+    layout.add (std::make_unique<APF> (PID { "fm_3to4", 1 }, "FM 3 > 4",
+                                       Range (0.0f, 1.0f, 0.001f), 0.0f));
+
     // ---- Filter -------------------------------------------------------------
     layout.add (std::make_unique<APF> (PID { "cutoff", 1 }, "Cutoff", skewed (20.0f, 20000.0f, 1000.0f),
                                        1500.0f, Attr().withLabel ("Hz")));
@@ -85,11 +91,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
         layout.add (std::make_unique<APF> (PID { lfoID (i, "rate"), 1 }, n + "Rate",
                                            skewed (0.02f, 30.0f, 2.0f), 2.0f, Attr().withLabel ("Hz")));
         layout.add (std::make_unique<APC> (PID { lfoID (i, "shape"), 1 }, n + "Shape",
-                                           juce::StringArray { "Sine", "Triangle", "Saw", "Square", "S&H" }, 0));
+                                           juce::StringArray { "Sine", "Tri", "Saw", "Square", "S&H" }, 0));
         layout.add (std::make_unique<APF> (PID { lfoID (i, "amount"), 1 }, n + "Amount",
                                            Range (-1.0f, 1.0f, 0.001f), 0.0f));
         layout.add (std::make_unique<APC> (PID { lfoID (i, "dest"), 1 }, n + "Destination",
-                                           juce::StringArray { "Off", "Pitch", "Osc Shape", "Pulse Width", "Cutoff", "Amp" },
+                                           juce::StringArray { "Off", "Pitch", "Shape", "PW", "Cutoff", "Amp" },
                                            i == 0 ? destPitch : destOff));
     }
 
@@ -102,6 +108,24 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
                                        skewed (200.0f, 16000.0f, 3000.0f), 6000.0f, Attr().withLabel ("Hz")));
     layout.add (std::make_unique<APF> (PID { "delay_mix", 1 }, "Delay Mix",
                                        Range (0.0f, 1.0f, 0.001f), 0.0f));
+
+    // ---- Step sequencer -----------------------------------------------------
+    layout.add (std::make_unique<juce::AudioParameterBool> (PID { "seq_on", 1 },   "Seq On",   false));
+    layout.add (std::make_unique<juce::AudioParameterBool> (PID { "seq_gate", 1 }, "Seq Gate", true));
+    layout.add (std::make_unique<APC> (PID { "seq_rate", 1 }, "Seq Rate",
+                                       juce::StringArray { "1/4", "1/8", "1/16", "1/32" }, 2));
+    layout.add (std::make_unique<APC> (PID { "seq_dest", 1 }, "Seq Destination",
+                                       juce::StringArray { "Pitch", "Cutoff", "Pan" }, 0));
+
+    // A musical starter pattern (in 1/12ths, so pitch lands on semitones: 7 = fifth, 12 = octave).
+    static const float pattern[16] = { 0, 7, 4, 7,  0, 7, 12, 7,  0, 7, 4, 7,  0, 4, 7, 12 };
+    for (int i = 0; i < 16; ++i)
+        layout.add (std::make_unique<APF> (PID { "seq_step_" + juce::String (i + 1), 1 },
+                                           "Seq Step " + juce::String (i + 1),
+                                           Range (-1.0f, 1.0f, 0.001f), pattern[i] / 12.0f));
+
+    layout.add (std::make_unique<APC> (PID { "skin", 1 }, "Skin",
+                                       juce::StringArray { "Blue", "White" }, 0));
 
     layout.add (std::make_unique<APF> (PID { "master", 1 }, "Master",
                                        Range (-48.0f, 6.0f, 0.1f), -6.0f, Attr().withLabel ("dB")));
@@ -128,6 +152,9 @@ void bindPointers (juce::AudioProcessorValueTreeState& s, ParamPointers& p)
             p.oscPW[i] = get (oscID (i, "pw"));
     }
 
+    p.fm43      = get ("fm_4to3");
+    p.fm34      = get ("fm_3to4");
+
     p.cutoff    = get ("cutoff");
     p.resonance = get ("resonance");
     p.poles     = get ("poles");
@@ -152,6 +179,13 @@ void bindPointers (juce::AudioProcessorValueTreeState& s, ParamPointers& p)
     p.delayFeedback = get ("delay_feedback");
     p.delayTone     = get ("delay_tone");
     p.delayMix      = get ("delay_mix");
+    p.seqOn   = get ("seq_on");
+    p.seqGate = get ("seq_gate");
+    p.seqRate = get ("seq_rate");
+    p.seqDest = get ("seq_dest");
+    for (int i = 0; i < 16; ++i)
+        p.seqStep[i] = get ("seq_step_" + juce::String (i + 1));
+
     p.master        = get ("master");
 }
 } // namespace evo

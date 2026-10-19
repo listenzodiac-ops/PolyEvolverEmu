@@ -36,12 +36,21 @@ public:
 
     // Order matters: apvts must be constructed before 'params' and 'synth'.
     juce::AudioProcessorValueTreeState apvts;
-    juce::MidiKeyboardState keyboardState;   // shared with the on-screen keyboard
+    juce::MidiKeyboardState keyboardState;   // (no on-screen keyboard any more, kept for MIDI merging)
+
+    std::atomic<int> currentStep { -1 };     // step being played, for the editor (-1 = sequencer idle)
 
 private:
     evo::ParamPointers params;
+    evo::SeqState seqState;                  // must be declared before 'synth' (voices point at it)
     juce::Synthesiser synth;
     evo::StereoDelay delay;
+
+    double sampleRateHz = 44100.0;
+    double internalPpq  = 0.0;               // free-running clock used by the standalone app
+    int    lastStep     = -1;
+
+    void applyStep (int step, int dest);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PolyEvolverAudioProcessor)
 };

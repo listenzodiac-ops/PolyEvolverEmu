@@ -25,6 +25,9 @@ struct ParamPointers
     std::atomic<float>* oscShape[numOscs] {};
     std::atomic<float>* oscPW   [numOscs] {};   // only 0 and 1 are used
 
+    std::atomic<float>* fm43       = nullptr;   // osc 4 -> osc 3 FM amount
+    std::atomic<float>* fm34       = nullptr;   // osc 3 -> osc 4 FM amount
+
     std::atomic<float>* cutoff     = nullptr;
     std::atomic<float>* resonance  = nullptr;
     std::atomic<float>* poles      = nullptr;   // 0 = 2-pole, 1 = 4-pole
@@ -46,6 +49,13 @@ struct ParamPointers
     std::atomic<float>* delayFeedback = nullptr;
     std::atomic<float>* delayTone = nullptr;
     std::atomic<float>* delayMix = nullptr;
+
+    // Step sequencer
+    std::atomic<float>* seqOn   = nullptr;
+    std::atomic<float>* seqGate = nullptr;   // retrigger envelopes on every step
+    std::atomic<float>* seqRate = nullptr;   // 0 = 1/4, 1 = 1/8, 2 = 1/16, 3 = 1/32
+    std::atomic<float>* seqDest = nullptr;   // 0 = pitch, 1 = cutoff, 2 = pan
+    std::atomic<float>* seqStep[16] {};
 
     std::atomic<float>* master = nullptr;
 };

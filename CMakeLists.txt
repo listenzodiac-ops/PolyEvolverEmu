@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(PolyEvolverEmu VERSION 0.1.0)
+project(ZSynth VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,12 +22,12 @@ else()
     set(EVO_COPY_AFTER_BUILD TRUE)
 endif()
 
-juce_add_plugin(PolyEvolverEmu
+juce_add_plugin(ZSynth
     COMPANY_NAME                "YourName"
     PLUGIN_MANUFACTURER_CODE    Ynam
     PLUGIN_CODE                 Pevo
     FORMATS                     VST3 AU Standalone
-    PRODUCT_NAME                "Poly Evolver Emu"
+    PRODUCT_NAME                "Z-Synth"
     IS_SYNTH                    TRUE
     NEEDS_MIDI_INPUT            TRUE
     NEEDS_MIDI_OUTPUT           FALSE
@@ -35,9 +35,9 @@ juce_add_plugin(PolyEvolverEmu
     AU_MAIN_TYPE                kAudioUnitType_MusicDevice
     VST3_CATEGORIES             Instrument Synth)
 
-juce_generate_juce_header(PolyEvolverEmu)
+juce_generate_juce_header(ZSynth)
 
-target_sources(PolyEvolverEmu PRIVATE
+target_sources(ZSynth PRIVATE
     Source/Params.h
     Source/Params.cpp
     Source/WaveTables.h
@@ -48,12 +48,12 @@ target_sources(PolyEvolverEmu PRIVATE
     Source/PluginEditor.h
     Source/PluginEditor.cpp)
 
-target_compile_definitions(PolyEvolverEmu PUBLIC
+target_compile_definitions(ZSynth PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0)
 
-target_link_libraries(PolyEvolverEmu
+target_link_libraries(ZSynth
     PRIVATE
         juce::juce_audio_utils
     PUBLIC

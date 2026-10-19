@@ -1,8 +1,8 @@
-# Poly Evolver Emu
+# Z-Synth
 
 A JUCE (C++) VST3 / AU / Standalone synth inspired by the Dave Smith Instruments (Sequential) **Poly Evolver**. This is version 0.1: the core voice architecture, with the sequencer, modulation matrix and effects still to come.
 
-This is an original, from-scratch emulation of the *architecture and sound character*, not a sample-accurate clone. Before you distribute it, pick your own product name (change `PRODUCT_NAME` and `COMPANY_NAME` in `CMakeLists.txt`); "Poly Evolver" is Sequential's trademark.
+This is an original, from-scratch synth inspired by the architecture and sound character of the Poly Evolver, not a sample-accurate clone. Z-Synth is the product name; change `PRODUCT_NAME` and `COMPANY_NAME` in `CMakeLists.txt` if you want something else.
 
 ## What's in it
 
@@ -16,6 +16,8 @@ This is an original, from-scratch emulation of the *architecture and sound chara
 | **4 LFOs** | Sine / tri / saw / square / S&H. Per-voice. Destinations: pitch, osc shape, pulse width, cutoff, amp. |
 | **Delay** | Stereo feedback delay with a tone filter in the feedback path. |
 | **Master** | Volume plus tanh soft-clip safety. |
+| **Step sequencer** | 16 steps, locked to the DAW: it starts when you press play and follows the host tempo and position (standalone app: internal 120 BPM clock). `Dest` chooses what the 16 knobs control: pitch (+/-12 semitones, snapped to notes), cutoff (+/-3 octaves) or pan (left to right). `Rate` is 1/4, 1/8, 1/16 or 1/32. `Gate` retriggers the envelopes on every step. |
+| **Skins** | Blue and white, switched with the two swatches at the top right. Your choice is saved with the project. |
 
 ## Build on macOS
 
@@ -26,20 +28,20 @@ This is an original, from-scratch emulation of the *architecture and sound chara
    ```
 2. Configure and build (the first run downloads JUCE, so you need internet and git):
    ```
-   cd PolyEvolverEmu
+   cd ZSynth
    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
    cmake --build build --config Release -j 8
    ```
 3. The build copies the plugins into place automatically:
    - VST3: `~/Library/Audio/Plug-Ins/VST3/`
    - AU: `~/Library/Audio/Plug-Ins/Components/`
-   - Standalone app: look under `build/PolyEvolverEmu_artefacts/`
+   - Standalone app: look under `build/ZSynth_artefacts/`
 
 **First test:** launch the Standalone app and click the on-screen keyboard (or connect a MIDI keyboard in the app's audio/MIDI settings). If you hear a detuned saw pair with a filter sweep, the whole chain works. Then rescan plugins in your DAW.
 
 **If your DAW won't load it:** ad-hoc sign the plugin so macOS stops blocking it:
 ```
-codesign --force --deep -s - ~/Library/Audio/Plug-Ins/VST3/"Poly Evolver Emu.vst3"
+codesign --force --deep -s - ~/Library/Audio/Plug-Ins/VST3/"Z-Synth.vst3"
 ```
 For Logic (AU), validate with `auval -v aumu Pevo Ynam`.
 
