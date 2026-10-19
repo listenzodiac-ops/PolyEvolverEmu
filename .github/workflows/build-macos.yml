@@ -1,1 +1,57 @@
+name: Build macOS plugin
 
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Configure (universal build for Apple Silicon and Intel)
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Collect and ad-hoc sign
+        run: |
+          ART="build/PolyEvolverEmu_artefacts/Release"
+          mkdir -p dist/VST3 dist/AU dist/Standalone
+          cp -R "$ART/VST3/Poly Evolver Emu.vst3"      dist/VST3/
+          cp -R "$ART/AU/Poly Evolver Emu.component"   dist/AU/
+          cp -R "$ART/Standalone/Poly Evolver Emu.app" dist/Standalone/
+          codesign --force --deep -s - "dist/VST3/Poly Evolver Emu.vst3"
+          codesign --force --deep -s - "dist/AU/Poly Evolver Emu.component"
+          codesign --force --deep -s - "dist/Standalone/Poly Evolver Emu.app"
+          find dist -maxdepth 2
+
+      - name: Build installer .pkg
+        run: |
+          mkdir -p stage/Library/Audio/Plug-Ins/VST3 stage/Library/Audio/Plug-Ins/Components stage/Applications
+          cp -R "dist/VST3/Poly Evolver Emu.vst3"      stage/Library/Audio/Plug-Ins/VST3/
+          cp -R "dist/AU/Poly Evolver Emu.component"   stage/Library/Audio/Plug-Ins/Components/
+          cp -R "dist/Standalone/Poly Evolver Emu.app" stage/Applications/
+          pkgbuild --root stage --identifier com.yourname.polyevolveremu \
+                   --version 0.1.0 --install-location / PolyEvolverEmu-Installer.pkg
+
+      - name: Zip the plain plugin files too
+        run: ditto -c -k --keepParent dist PolyEvolverEmu-macOS-files.zip
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: PolyEvolverEmu-Installer
+          path: PolyEvolverEmu-Installer.pkg
+
+      - name: Upload plain files
+        uses: actions/upload-artifact@v4
+        with:
+          name: PolyEvolverEmu-macOS-files
+          path: PolyEvolverEmu-macOS-files.zip
