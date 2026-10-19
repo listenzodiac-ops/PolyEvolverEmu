@@ -22,36 +22,36 @@ jobs:
 
       - name: Collect and ad-hoc sign
         run: |
-          ART="build/PolyEvolverEmu_artefacts/Release"
+          ART="build/ZSynth_artefacts/Release"
           mkdir -p dist/VST3 dist/AU dist/Standalone
-          cp -R "$ART/VST3/Poly Evolver Emu.vst3"      dist/VST3/
-          cp -R "$ART/AU/Poly Evolver Emu.component"   dist/AU/
-          cp -R "$ART/Standalone/Poly Evolver Emu.app" dist/Standalone/
-          codesign --force --deep -s - "dist/VST3/Poly Evolver Emu.vst3"
-          codesign --force --deep -s - "dist/AU/Poly Evolver Emu.component"
-          codesign --force --deep -s - "dist/Standalone/Poly Evolver Emu.app"
+          cp -R "$ART/VST3/Z-Synth.vst3"      dist/VST3/
+          cp -R "$ART/AU/Z-Synth.component"   dist/AU/
+          cp -R "$ART/Standalone/Z-Synth.app" dist/Standalone/
+          codesign --force --deep -s - "dist/VST3/Z-Synth.vst3"
+          codesign --force --deep -s - "dist/AU/Z-Synth.component"
+          codesign --force --deep -s - "dist/Standalone/Z-Synth.app"
           find dist -maxdepth 2
 
       - name: Build installer .pkg
         run: |
           mkdir -p stage/Library/Audio/Plug-Ins/VST3 stage/Library/Audio/Plug-Ins/Components stage/Applications
-          cp -R "dist/VST3/Poly Evolver Emu.vst3"      stage/Library/Audio/Plug-Ins/VST3/
-          cp -R "dist/AU/Poly Evolver Emu.component"   stage/Library/Audio/Plug-Ins/Components/
-          cp -R "dist/Standalone/Poly Evolver Emu.app" stage/Applications/
-          pkgbuild --root stage --identifier com.yourname.polyevolveremu \
-                   --version 0.1.0 --install-location / PolyEvolverEmu-Installer.pkg
+          cp -R "dist/VST3/Z-Synth.vst3"      stage/Library/Audio/Plug-Ins/VST3/
+          cp -R "dist/AU/Z-Synth.component"   stage/Library/Audio/Plug-Ins/Components/
+          cp -R "dist/Standalone/Z-Synth.app" stage/Applications/
+          pkgbuild --root stage --identifier com.yourname.zsynth \
+                   --version 0.1.0 --install-location / ZSynth-Installer.pkg
 
       - name: Zip the plain plugin files too
-        run: ditto -c -k --keepParent dist PolyEvolverEmu-macOS-files.zip
+        run: ditto -c -k --keepParent dist ZSynth-macOS-files.zip
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: PolyEvolverEmu-Installer
-          path: PolyEvolverEmu-Installer.pkg
+          name: ZSynth-Installer
+          path: ZSynth-Installer.pkg
 
       - name: Upload plain files
         uses: actions/upload-artifact@v4
         with:
-          name: PolyEvolverEmu-macOS-files
-          path: PolyEvolverEmu-macOS-files.zip
+          name: ZSynth-macOS-files
+          path: ZSynth-macOS-files.zip
